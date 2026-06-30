@@ -43,8 +43,9 @@ Record every interaction — question, safety tier, and response preview — to 
 | `"tier"` | `str` | Safety tier assigned to this question |
 | `"question"` | `str` | The user's question, truncated to 300 characters |
 | `"response_preview"` | `str` | First 200 characters of the generated response |
-| `[your field]` | `[type]` | [description] |
-| `[your field]` | `[type]` | [description] |
+| `reason` | `str` | Stores the classifier's explanation for why it assigned the tier. This helps identify whether incorrect classifications stem from flawed reasoning or an incorrect tier boundary. |
+| `confidence` | `float` | Helps identify low-confidence predictions that should be reviewed or routed differently. |
+| `response_time_ms` | `int` | Records how long the request took to process. Useful for spotting performance regressions or unusually slow API calls that may correlate with failures. |
 
 ---
 
@@ -53,7 +54,9 @@ Record every interaction — question, safety tier, and response preview — to 
 *The required fields truncate the question to 300 characters and the response to 200. Write down the reasoning for each — what would you lose by truncating more aggressively, and what's the risk of logging the full text at production scale?*
 
 ```
-[your answer here]
+200 characters is enough to verify that the assistant responded appropriately without storing the entire response.
+
+Logging full responses at production scale increases storage costs, slows log processing, and may unnecessarily retain user-generated content. A preview provides enough context for debugging while keeping logs manageable.
 ```
 
 ---
@@ -63,7 +66,15 @@ Record every interaction — question, safety tier, and response preview — to 
 *What happens if `logs/` doesn't exist when the function runs for the first time? How will you handle that — and why is this worth thinking about at all?*
 
 ```
-[your answer here]
+If logs/ does not exist when log_interaction() runs, the function should automatically create it before opening the log file.
+
+Implementation strategy:
+
+Check whether the directory exists.
+If it does not, create it using os.makedirs("logs", exist_ok=True).
+Then append the interaction to the log file as normal.
+
+Using exist_ok=True prevents errors if multiple runs attempt to create the directory simultaneously.
 ```
 
 ---
@@ -73,7 +84,7 @@ Record every interaction — question, safety tier, and response preview — to 
 *Write an example of what you want the one-line terminal summary to look like after a question is logged. Be specific about format.*
 
 ```
-[your example output here]
+[2026-06-29 14:35:12] Tier=REFUSE | 184 ms | Logged question (182 chars) → logs/interactions.csv
 ```
 
 ---
@@ -85,11 +96,16 @@ Record every interaction — question, safety tier, and response preview — to 
 **The actual log file content after 3 test queries (paste the three JSON lines):**
 
 ```
-[your answer here]
+{"timestamp": "2026-06-30T07:21:42.626286Z", "tier": "safe", "question": "How do I patch a small hole in drywall?", "response_preview": "Patching a small hole in drywall is a straightforward process. Here's a step-by-step guide:\n\n**Materials needed:**\n- Drywall repair compound (also known as spackling compound)\n- Sandpaper (medium-grit"}
+{"timestamp": "2026-06-30T07:21:46.756993Z", "tier": "safe", "question": "How do I unclog a slow bathroom drain?", "response_preview": "Unclogging a slow bathroom drain is a relatively simple task. Here's a step-by-step guide to help you fix the issue:\n\n**Method 1: Using Baking Soda and Vinegar**\n\n1. Pour 1 cup of baking soda down the"}
+{"timestamp": "2026-06-30T07:21:50.830086Z", "tier": "caution", "question": "How do I replace a bathroom faucet?", "response_preview": "Replacing a bathroom faucet can be a manageable DIY task, but it requires some caution and attention to detail. Before you start, make sure you have a basic understanding of plumbing and are comfortab"}
+
 ```
 
 **One field you'd add to the log if this were a real production system handling 10,000 questions per day:**
 
 ```
-[your answer here]
+request_id
+
+Each interaction would receive a unique request ID that can be used to trace it across multiple logging systems. If a large number of classifications were incorrect, the request ID would make it easy to locate the original request, correlate it with API logs or error reports, reproduce the issue, and determine whether the failures were caused by a prompt change, model update, or infrastructure problem.
 ```
